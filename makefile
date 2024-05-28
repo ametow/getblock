@@ -8,10 +8,10 @@ cli:
 service:
 	@CGO_ENABLED=0 go build -o getblockd cmd/daemon/main.go
 
-run-cli:
+run-cli: cli
 	GETBLOCK_KEY=${API_KEY} ./getblock-cli -c etc/config.yaml
 
-run-service:
+run-service: service
 	GETBLOCK_KEY=${API_KEY} ./getblockd -c etc/config.yaml
 
 image:
