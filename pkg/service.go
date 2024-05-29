@@ -79,9 +79,7 @@ func (s *Service) walkBlocks(ctx context.Context, blockNumber int64) (<-chan *Bl
 	go func() {
 		wg.Wait()
 		close(ch)
-		if len(errc) == 0 {
-			errc <- nil
-		}
+		close(errc)
 	}()
 	return ch, errc
 }
