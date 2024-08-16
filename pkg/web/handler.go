@@ -21,7 +21,8 @@ func NewHandlerContext(s *pkg.Service, ctx context.Context) *Handler {
 }
 
 func (c *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	res, err := c.service.Run(c.context)
+	r = r.WithContext(c.context)
+	res, err := c.service.Run(r.Context())
 	if err != nil {
 		log.Println("error while running:", err)
 		fmt.Fprintln(w, "Server error ((")

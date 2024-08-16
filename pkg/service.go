@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"io"
 
 	"github.com/ametow/getblock/config"
 )
@@ -41,7 +42,6 @@ func (s *Service) Run(ctx context.Context) (*MaxTransaction, error) {
 
 	var wg sync.WaitGroup
 	for i := 0; i < s.config.GoroutineCount; i++ {
-		i := i // can be omitted if go version is >= 1.22
 		wg.Add(1)
 		go s.worker(ctx, i, blocksChan, &wg)
 	}
@@ -57,10 +57,11 @@ func (s *Service) Run(ctx context.Context) (*MaxTransaction, error) {
 func (s *Service) walkBlocks(ctx context.Context, blockNumber int64) (<-chan *BlockResponse, <-chan error) {
 	ch := make(chan *BlockResponse)
 	errc := make(chan error, 1)
-	var wg sync.WaitGroup
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
+		defer func() {
+			close(ch)
+			close(errc)
+		}()
 		for i := 0; i < s.config.BlockCount; i++ {
 			blockNumberHex := fmt.Sprintf("0x%x", blockNumber-int64(i))
 			block, err := s.getBlockByNumber(ctx, blockNumberHex)
@@ -76,11 +77,6 @@ func (s *Service) walkBlocks(ctx context.Context, blockNumber int64) (<-chan *Bl
 			}
 		}
 	}()
-	go func() {
-		wg.Wait()
-		close(ch)
-		close(errc)
-	}()
 	return ch, errc
 }
 
@@ -89,9 +85,11 @@ func (s *Service) worker(ctx context.Context, id int, dataChan <-chan *BlockResp
 	for {
 		select {
 		case <-ctx.Done():
+			log.Print("context Done worker", ctx.Err())
 			return
 		case block, ok := <-dataChan:
 			if !ok {
+				log.Print("worker closed of channel close")
 				return
 			}
 			for _, tx := range block.Result.Transactions {
@@ -108,20 +106,20 @@ func (s *Service) worker(ctx context.Context, id int, dataChan <-chan *BlockResp
 }
 
 func (s *Service) updateAddresses(tx *Transaction, value *big.Int) {
-	var to, from *big.Int
+	var receiverBalance, senderBalance *big.Int
 	var exists bool
 	s.mutex.Lock()
-	if from, exists = s.addresses[tx.From]; !exists {
-		from = new(big.Int)
-		s.addresses[tx.From] = from
+	defer s.mutex.Unlock()
+	if senderBalance, exists = s.addresses[tx.From]; !exists {
+		senderBalance = new(big.Int)
+		s.addresses[tx.From] = senderBalance
 	}
-	if to, exists = s.addresses[tx.To]; !exists {
-		to = new(big.Int)
-		s.addresses[tx.To] = to
+	if receiverBalance, exists = s.addresses[tx.To]; !exists {
+		receiverBalance = new(big.Int)
+		s.addresses[tx.To] = receiverBalance
 	}
-	s.addresses[tx.From] = from.Sub(from, value)
-	s.addresses[tx.To] = to.Add(to, value)
-	s.mutex.Unlock()
+	s.addresses[tx.From] = senderBalance.Sub(senderBalance, value)
+	s.addresses[tx.To] = receiverBalance.Add(receiverBalance, value)
 }
 
 func (s *Service) getMaxTransaction() *MaxTransaction {
@@ -142,16 +140,15 @@ func (s *Service) getMaxTransaction() *MaxTransaction {
 
 func (s *Service) getLatestBlockNumber(ctx context.Context) (string, error) {
 	payload := `{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":"getblock.io"}`
-	resp, err := s.makeRequest(ctx, payload)
+	body, err := s.makeRequest(ctx, payload)
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
 
 	var result struct {
 		Result string `json:"result"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(body, &result); err != nil {
 		return "", err
 	}
 
@@ -160,21 +157,20 @@ func (s *Service) getLatestBlockNumber(ctx context.Context) (string, error) {
 
 func (s *Service) getBlockByNumber(ctx context.Context, blockNumber string) (*BlockResponse, error) {
 	payload := fmt.Sprintf(`{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["%s", true],"id":"getblock.io"}`, blockNumber)
-	resp, err := s.makeRequest(ctx, payload)
+	body, err := s.makeRequest(ctx, payload)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
 
 	var blockResponse BlockResponse
-	if err := json.NewDecoder(resp.Body).Decode(&blockResponse); err != nil {
+	if err := json.Unmarshal(body, &blockResponse); err != nil {
 		return nil, err
 	}
 
 	return &blockResponse, nil
 }
 
-func (s *Service) makeRequest(ctx context.Context, payload string) (*http.Response, error) {
+func (s *Service) makeRequest(ctx context.Context, payload string) ([]byte, error) {
 	req, err := http.NewRequestWithContext(ctx, "POST", s.config.BaseApiUrl+s.config.ApiKey, bytes.NewBuffer([]byte(payload)))
 	if err != nil {
 		return nil, err
@@ -182,16 +178,18 @@ func (s *Service) makeRequest(ctx context.Context, payload string) (*http.Respon
 	req.Header.Set("Content-Type", contentType)
 
 	client := &http.Client{}
+	defer client.CloseIdleConnections()
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	return resp, nil
+	return io.ReadAll(resp.Body)
 }
 
 func weiToEth(wei *big.Int) *big.Float {

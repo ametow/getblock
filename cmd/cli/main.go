@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"flag"
+	"time"
 	"fmt"
 	"log"
 	"os"
-	"time"
+	"runtime"
 
 	"github.com/ametow/getblock/pkg"
 	"github.com/ametow/getblock/pkg/utils"
@@ -38,4 +39,12 @@ func main() {
 	}
 
 	fmt.Printf("Address: %s\nWei: %s\nEth: %.8f\nDollars: %s\n", res.Address, res.Wei.String(), res.Eth, res.Dollars)
+	fmt.Printf("Number of active goroutines: %d\n", runtime.NumGoroutine())
+	printGoroutines()
+}
+
+func printGoroutines() {
+    buf := make([]byte, 1<<20) // 1 MB buffer
+    n := runtime.Stack(buf, true)
+    fmt.Printf("%s", buf[:n])
 }
