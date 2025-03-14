@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/ametow/getblock/pkg"
-
 	"log"
+
+	pkg "github.com/ametow/getblock/internal"
 )
 
 type Handler struct {

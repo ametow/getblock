@@ -1,5 +1,5 @@
 BaseApiUrl: "https://go.getblock.io/"
 ListenAddress: "0.0.0.0:8080"
-EthPrice: 3876.3
-BlockCount: 30
-GoroutineCount: 30
+EthPrice: 1933.64
+BlockCount: 10
+GoroutineCount: 4

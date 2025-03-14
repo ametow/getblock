@@ -5,12 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math/big"
 	"net/http"
 	"strconv"
 	"sync"
-	"io"
 
 	"github.com/ametow/getblock/config"
 )
@@ -92,6 +92,7 @@ func (s *Service) worker(ctx context.Context, id int, dataChan <-chan *BlockResp
 				log.Print("worker closed of channel close")
 				return
 			}
+			log.Print("processing block: ", block.Result.Number, "on worker: ", id)
 			for _, tx := range block.Result.Transactions {
 				tx := tx
 				value, ok := new(big.Int).SetString(tx.Value, 0)

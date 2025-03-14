@@ -10,9 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ametow/getblock/pkg"
-	"github.com/ametow/getblock/pkg/utils"
-	"github.com/ametow/getblock/pkg/web"
+	pkg "github.com/ametow/getblock/internal"
+	"github.com/ametow/getblock/internal/utils"
+	"github.com/ametow/getblock/internal/web"
 )
 
 var configFile = flag.String("c", "etc/config.yaml", "config file")
