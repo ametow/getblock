@@ -1,33 +1,32 @@
-# GetBlock.io
+# GetBlock.io  
 
-## Запуск
+## Launch  
 
-Для подключения к api getblock.io нам нужно указать api ключ в `makefile` в переменную `$API_KEY` или присвоить к переменному окружения `GETBLOCK_KEY`
+To connect to the GetBlock.io API, you need to specify the API key in the `makefile` by setting the `$API_KEY` variable or assigning it to the environment variable `GETBLOCK_KEY`.  
 
-### Консольная версия
+### Command Line Version  
 
 ```sh
 make cli
 make run-cli
 ```
 
-### Веб api версия
+### Web API Version  
 
 ```sh
 make service
 make run-service
 ```
 
-Для веб версии дергаем ручку по умолчанию: http://localhost:8080/api/get
+For the web version, the default endpoint is: [http://localhost:8080/api/get](http://localhost:8080/api/get)  
 
-
-## Docker
+## Docker  
 
 ```sh
 make container-cli
 ```
 
-or
+or  
 
 ```sh
 make container-service
